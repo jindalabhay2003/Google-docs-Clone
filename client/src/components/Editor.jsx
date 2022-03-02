@@ -5,6 +5,7 @@ import 'quill/dist/quill.snow.css';
 import styled from "@emotion/styled";
 
 import {io} from "socket.io-client";
+import { useParams } from "react-router-dom";
 
 const Component = styled.div`
       background: #F5F5F5;
@@ -36,9 +37,14 @@ const Editor = ()=> {
     const [socket, setSocket] = useState();
     const [quill, setQuill] = useState();
 
+    // we are id here because in App.js during specifing routes we use name as /docs/:id only
+    const { id } = useParams();
+
     useEffect(()=>{
 
         const quillServer = new Quill('#container', {theme: 'snow', modules: {toolbar: toolbarOptions}});
+        quillServer.disable();
+        quillServer.setText("Loding the document.....");
         setQuill(quillServer);
     },[]);
 
@@ -91,7 +97,37 @@ const Editor = ()=> {
                     socket && socket.off('receive-changes',handleChange);
                 }
     
-            },[quill,socket]);  
+            },[quill,socket]);
+            
+            useEffect(()=>{
+
+                if(quill == null || socket==null){
+                    return;
+                }
+
+                socket && socket.once('load-document', document=> {
+                    quill && quill.setContents(document);
+                    quill && quill.enable();
+                })
+
+                socket && socket.emit('get-document',id);
+
+            },[quill,socket,id])
+
+            useEffect(()=> {
+                if(socket === null || quill === null){
+                    return;
+                }
+
+                const Interval = setInterval(()=> {
+                    socket && socket.emit('save-document',quill.getContents());
+                },2000)
+
+                return () => {
+                    clearInterval(Interval);
+                }
+
+            },[socket,quill]);
 
     return (
         <Component>
